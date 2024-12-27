@@ -6,12 +6,6 @@ config OTA_VERSION_URL
     help
         The application will access this URL to check for updates.
 
-config USE_OPUS_CODEC
-    bool "Use Opus Audio Codec"
-    default y
-    help
-        Enable/disable Opus audio codec. If disabled, raw PCM audio will be used.
-
 choice CONNECTION_TYPE
     prompt "Connection Type"
     default CONNECTION_TYPE_MQTT_UDP

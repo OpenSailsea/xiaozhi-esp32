@@ -179,9 +179,7 @@ void WakeWordDetect::EncodeWakeWordData() {
     wake_word_encode_task_ = xTaskCreateStatic([](void* arg) {
         auto this_ = (WakeWordDetect*)arg;
         auto start_time = esp_timer_get_time();
-
-#if CONFIG_USE_OPUS_CODEC
-        // encode detect packets using opus
+        // encode detect packets
         OpusEncoder* encoder = new OpusEncoder();
         encoder->Configure(16000, 1, 60);
         encoder->SetComplexity(0);
@@ -193,25 +191,16 @@ void WakeWordDetect::EncodeWakeWordData() {
                 this_->wake_word_cv_.notify_all();
             });
         }
-        delete encoder;
-#else
-        // directly use PCM data
-        for (auto& pcm: this_->wake_word_pcm_) {
-            std::lock_guard<std::mutex> lock(this_->wake_word_mutex_);
-            this_->wake_word_opus_.emplace_back(std::string(reinterpret_cast<const char*>(pcm.data()), pcm.size() * sizeof(int16_t)));
-            this_->wake_word_cv_.notify_all();
-        }
-#endif
-
         this_->wake_word_pcm_.clear();
 
         auto end_time = esp_timer_get_time();
-        ESP_LOGI(TAG, "Encode wake word data %zu packets in %lld ms", this_->wake_word_opus_.size(), (end_time - start_time) / 1000);
+        ESP_LOGI(TAG, "Encode wake word opus %zu packets in %lld ms", this_->wake_word_opus_.size(), (end_time - start_time) / 1000);
         {
             std::lock_guard<std::mutex> lock(this_->wake_word_mutex_);
             this_->wake_word_opus_.push_back("");
             this_->wake_word_cv_.notify_all();
         }
+        delete encoder;
         vTaskDelete(NULL);
     }, "encode_detect_packets", 4096 * 8, this, 1, wake_word_encode_task_stack_, &wake_word_encode_task_buffer_);
 }

@@ -4,17 +4,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
-#include <mutex>
-#if CONFIG_USE_OPUS_CODEC
 #include <opus.h>
-#endif
+#include <mutex>
 #include <list>
 #include <condition_variable>
 
-#if CONFIG_USE_OPUS_CODEC
 #include "opus_encoder.h"
 #include "opus_resampler.h"
-#endif
 
 #include "protocol.h"
 #include "display.h"
@@ -84,14 +80,13 @@ private:
     std::chrono::steady_clock::time_point last_output_time_;
     std::list<std::string> audio_decode_queue_;
 
-#if CONFIG_USE_OPUS_CODEC
     OpusEncoder opus_encoder_;
     OpusDecoder* opus_decoder_ = nullptr;
+
     int opus_decode_sample_rate_ = -1;
     OpusResampler input_resampler_;
     OpusResampler reference_resampler_;
     OpusResampler output_resampler_;
-#endif
 
     void MainLoop();
     void InputAudio();
