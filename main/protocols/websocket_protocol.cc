@@ -108,7 +108,11 @@ bool WebsocketProtocol::OpenAudioChannel() {
     message += "\"version\": 1,";
     message += "\"transport\":\"websocket\",";
     message += "\"audio_params\":{";
+#if CONFIG_USE_OPUS_CODEC
     message += "\"format\":\"opus\", \"sample_rate\":16000, \"channels\":1, \"frame_duration\":" + std::to_string(OPUS_FRAME_DURATION_MS);
+#else
+    message += "\"format\":\"pcm\", \"sample_rate\":16000, \"channels\":1";
+#endif
     message += "}}";
     websocket_->Send(message);
 

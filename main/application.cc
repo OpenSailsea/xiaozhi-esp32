@@ -33,9 +33,11 @@ Application::~Application() {
     if (protocol_ != nullptr) {
         delete protocol_;
     }
+#if CONFIG_USE_OPUS_CODEC
     if (opus_decoder_ != nullptr) {
         opus_decoder_destroy(opus_decoder_);
     }
+#endif
 
     vEventGroupDelete(event_group_);
 }
@@ -182,6 +184,7 @@ void Application::Start() {
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
+#if CONFIG_USE_OPUS_CODEC
     opus_decode_sample_rate_ = codec->output_sample_rate();
     opus_decoder_ = opus_decoder_create(opus_decode_sample_rate_, 1, NULL);
     opus_encoder_.Configure(16000, 1, OPUS_FRAME_DURATION_MS);
@@ -189,6 +192,7 @@ void Application::Start() {
         input_resampler_.Configure(codec->input_sample_rate(), 16000);
         reference_resampler_.Configure(codec->input_sample_rate(), 16000);
     }
+#endif
     codec->OnInputReady([this, codec]() {
         BaseType_t higher_priority_task_woken = pdFALSE;
         xEventGroupSetBitsFromISR(event_group_, AUDIO_INPUT_READY_EVENT, &higher_priority_task_woken);
@@ -222,12 +226,19 @@ void Application::Start() {
     audio_processor_.Initialize(codec->input_channels(), codec->input_reference());
     audio_processor_.OnOutput([this](std::vector<int16_t>&& data) {
         background_task_.Schedule([this, data = std::move(data)]() {
-            opus_encoder_.Encode(data, [this](const uint8_t* opus, size_t opus_size) {
-                Schedule([this, opus = std::string(reinterpret_cast<const char*>(opus), opus_size)]() {
-                    protocol_->SendAudio(opus);
-                });
+#if CONFIG_USE_OPUS_CODEC
+        opus_encoder_.Encode(data, [this](const uint8_t* opus, size_t opus_size) {
+            Schedule([this, opus = std::string(reinterpret_cast<const char*>(opus), opus_size)]() {
+                protocol_->SendAudio(opus);
             });
         });
+#else
+        // 直接发送PCM数据
+        Schedule([this, data = std::move(data)]() {
+            protocol_->SendAudio(std::string(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(int16_t)));
+        });
+#endif
+    });
     });
 
     wake_word_detect_.Initialize(codec->input_channels(), codec->input_reference());
@@ -397,7 +408,9 @@ void Application::MainLoop() {
 
 void Application::ResetDecoder() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if CONFIG_USE_OPUS_CODEC
     opus_decoder_ctl(opus_decoder_, OPUS_RESET_STATE);
+#endif
     audio_decode_queue_.clear();
     last_output_time_ = std::chrono::steady_clock::now();
     Board::GetInstance().GetAudioCodec()->EnableOutput(true);
@@ -426,18 +439,20 @@ void Application::OutputAudio() {
     }
 
     last_output_time_ = now;
-    auto opus = std::move(audio_decode_queue_.front());
+    auto audio_data = std::move(audio_decode_queue_.front());
     audio_decode_queue_.pop_front();
     lock.unlock();
 
-    background_task_.Schedule([this, codec, opus = std::move(opus)]() {
+    background_task_.Schedule([this, codec, audio_data = std::move(audio_data)]() {
         if (aborted_) {
             return;
         }
+
+#if CONFIG_USE_OPUS_CODEC
         int frame_size = opus_decode_sample_rate_ * OPUS_FRAME_DURATION_MS / 1000;
         std::vector<int16_t> pcm(frame_size);
 
-        int ret = opus_decode(opus_decoder_, (const unsigned char*)opus.data(), opus.size(), pcm.data(), frame_size, 0);
+        int ret = opus_decode(opus_decoder_, (const unsigned char*)audio_data.data(), audio_data.size(), pcm.data(), frame_size, 0);
         if (ret < 0) {
             ESP_LOGE(TAG, "Failed to decode audio, error code: %d", ret);
             return;
@@ -450,6 +465,11 @@ void Application::OutputAudio() {
             output_resampler_.Process(pcm.data(), frame_size, resampled.data());
             pcm = std::move(resampled);
         }
+#else
+        // 直接使用PCM数据
+        std::vector<int16_t> pcm(audio_data.size() / sizeof(int16_t));
+        memcpy(pcm.data(), audio_data.data(), audio_data.size());
+#endif
         
         codec->OutputData(pcm);
     });
