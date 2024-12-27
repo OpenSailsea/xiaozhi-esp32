@@ -52,6 +52,8 @@ if(CONFIG_IDF_TARGET_ESP32S3)
     list(APPEND SOURCES "audio_processing/audio_processor.cc" "audio_processing/wake_word_detect.cc")
 endif()
 
+list(APPEND SOURCES "audio_processing/resampler.cc")
+
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES "assets/err_reg.p3" "assets/err_pin.p3" "assets/err_wificonfig.p3"
                     INCLUDE_DIRS ${INCLUDE_DIRS}

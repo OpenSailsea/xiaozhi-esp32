@@ -28,8 +28,6 @@ public:
     void StartDetection();
     void StopDetection();
     bool IsDetectionRunning();
-    void EncodeWakeWordData();
-    bool GetWakeWordOpus(std::string& opus);
     const std::string& GetLastDetectedWakeWord() const { return last_detected_wake_word_; }
 
 private:
@@ -45,13 +43,7 @@ private:
     bool reference_;
     std::string last_detected_wake_word_;
 
-    TaskHandle_t wake_word_encode_task_ = nullptr;
-    StaticTask_t wake_word_encode_task_buffer_;
-    StackType_t* wake_word_encode_task_stack_ = nullptr;
     std::list<std::vector<int16_t>> wake_word_pcm_;
-    std::list<std::string> wake_word_opus_;
-    std::mutex wake_word_mutex_;
-    std::condition_variable wake_word_cv_;
 
     void StoreWakeWordData(uint16_t* data, size_t size);
     void AudioDetectionTask();

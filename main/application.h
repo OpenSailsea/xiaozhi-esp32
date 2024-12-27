@@ -4,19 +4,17 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
-#include <opus.h>
 #include <mutex>
 #include <list>
 #include <condition_variable>
-
-#include "opus_encoder.h"
-#include "opus_resampler.h"
+#include <cstdint>
 
 #include "protocol.h"
 #include "display.h"
 #include "board.h"
 #include "ota.h"
 #include "background_task.h"
+#include "audio_processing/resampler.h"
 
 #if CONFIG_IDF_TARGET_ESP32S3
 #include "wake_word_detect.h"
@@ -35,8 +33,6 @@ enum ChatState {
     kChatStateSpeaking,
     kChatStateUpgrading
 };
-
-#define OPUS_FRAME_DURATION_MS 60
 
 class Application {
 public:
@@ -79,14 +75,8 @@ private:
     BackgroundTask background_task_;
     std::chrono::steady_clock::time_point last_output_time_;
     std::list<std::string> audio_decode_queue_;
-
-    OpusEncoder opus_encoder_;
-    OpusDecoder* opus_decoder_ = nullptr;
-
-    int opus_decode_sample_rate_ = -1;
-    OpusResampler input_resampler_;
-    OpusResampler reference_resampler_;
-    OpusResampler output_resampler_;
+    int server_sample_rate_ = -1;
+    Resampler resampler_;
 
     void MainLoop();
     void InputAudio();

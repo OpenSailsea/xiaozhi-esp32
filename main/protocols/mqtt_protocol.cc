@@ -165,7 +165,7 @@ bool MqttProtocol::OpenAudioChannel() {
     message += "\"version\": 3,";
     message += "\"transport\":\"udp\",";
     message += "\"audio_params\":{";
-    message += "\"format\":\"opus\", \"sample_rate\":16000, \"channels\":1, \"frame_duration\":" + std::to_string(OPUS_FRAME_DURATION_MS);
+    message += "\"format\":\"pcm\", \"sample_rate\":16000, \"channels\":1";
     message += "}}";
     SendText(message);
 
